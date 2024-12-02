@@ -1,16 +1,45 @@
-name: Your Fork
+name: 'Terraform Apply'
 
 on:
-  pull_request_target:
-    types: [opened]
+  push:
+    branches:
+      - main
+
+env:
+  TF_CLOUD_ORGANIZATION: "22bandit"
+  TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
+  TF_WORKSPACE: "tf"
+  CONFIG_DIRECTORY: "./"
 
 jobs:
-  close:
-    if: github.repository == 'hashicorp/learn-terraform-github-actions'
+  terraform:
+    if: github.repository != 'hashicorp-education/learn-terraform-github-actions'
+    name: "Terraform Apply"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-    - uses: superbrothers/close-pull-request@v3
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Upload Configuration
+      uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
+      id: apply-upload
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        # Optional. Post a issue comment just before closing a pull request.
-        comment: "Hi! If you are following the Terraform GitHub Actions tutorial, please open the PR against [your personal fork](https://learn.hashicorp.com/tutorials/terraform/github-actions?in=terraform/automation#set-up-a-github-repository) of this repository. We will automatically close this PR, but if you intended to edit the example itself please feel free to re-open it."
+        workspace: ${{ env.tf }}
+        directory: ${{ env.CONFIG_DIRECTORY }}
+
+    - name: Create Apply Run
+      uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+      id: apply-run
+      with:
+        workspace: ${{ env.tf }}
+        configuration_version: ${{ steps.apply-upload.outputs.configuration_version_id }}
+
+    - name: Apply
+      uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.0.0
+      if: ${{ fromJSON(steps.apply-run.outputs.payload).data.attributes.actions.is_confirmable }}
+      id: apply
+      with:
+        run: ${{ steps.apply-run.outputs.run_id }}
+        comment: "Apply Run from GitHub Actions CI ${{ github.sha }}"
