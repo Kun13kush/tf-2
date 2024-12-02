@@ -13,7 +13,6 @@ env:
 
 jobs:
   terraform:
-    if: github.repository != 'Kun13kush/tf-2'
     name: "Terraform Apply"
     runs-on: ubuntu-latest
     permissions:
